@@ -110,7 +110,8 @@ async def install(
         By default, micropip is silent. Setting ``verbose=True`` will print
         similar information as pip.
     """
-    logger = setup_logging(verbose)
+    logger_wrapper = setup_logging(verbose)
+    logger = logger_wrapper.logger
 
     ctx = default_environment()
     if isinstance(requirements, str):
@@ -141,7 +142,8 @@ async def install(
         verbose=verbose,
         index_urls=index_urls,
     )
-    await transaction.gather_requirements(requirements)
+    with logger_wrapper.restore_temp():
+        await transaction.gather_requirements(requirements)
 
     if transaction.failed:
         failed_requirements = ", ".join([f"'{req}'" for req in transaction.failed])
@@ -175,7 +177,8 @@ async def install(
         # wheel metadata from PyPI has SHA256 checksum digest.
         wheel_promises.append(wheel.install(wheel_base))
 
-    await asyncio.gather(*wheel_promises)
+    with logger_wrapper.restore_temp():
+        await asyncio.gather(*wheel_promises)
 
     packages = [f"{pkg.name}-{pkg.version}" for pkg in transaction.pyodide_packages] + [
         f"{pkg.name}-{pkg.version}" for pkg in transaction.wheels
@@ -185,3 +188,4 @@ async def install(
         logger.info("Successfully installed " + ", ".join(packages))
 
     importlib.invalidate_caches()
+    logger_wrapper.restore()

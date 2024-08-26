@@ -28,7 +28,8 @@ def uninstall(packages: str | list[str], *, verbose: bool | int = False) -> None
         By default, micropip is silent. Setting ``verbose=True`` will print
         similar information as pip.
     """
-    logger = setup_logging(verbose)
+    logger_wrapper = setup_logging(verbose)
+    logger = logger_wrapper.logger
 
     if isinstance(packages, str):
         packages = [packages]
@@ -95,3 +96,4 @@ def uninstall(packages: str | list[str], *, verbose: bool | int = False) -> None
         logger.info(f"Successfully uninstalled {name}-{version}")
 
     importlib.invalidate_caches()
+    logger_wrapper.restore()

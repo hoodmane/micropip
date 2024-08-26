@@ -1,14 +1,14 @@
-import contextlib
 import logging
 import sys
 from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 
 _logger: logging.Logger | None = None
 _indentation: int = 0
 
 
-@contextlib.contextmanager
+@contextmanager
 def indent_log(num: int = 2) -> Generator[None, None, None]:
     """
     A context manager which will cause the log output to be indented for any
@@ -87,9 +87,30 @@ def _set_formatter_once() -> None:
     _logger.addHandler(ch)
 
 
-def setup_logging(verbosity: int | bool | None) -> logging.Logger:
+class LoggerWrapper:
+    __slots__ = ("logger", "_orig_level")
+
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+        self._orig_level = logger.level
+
+    def restore(self):
+        self.logger.setLevel(self._orig_level)
+
+    @contextmanager
+    def restore_temp(self):
+        cur_level = self.logger.level
+        self.logger.setLevel(self._orig_level)
+        try:
+            yield
+        finally:
+            self.logger.setLevel(cur_level)
+
+
+def setup_logging(verbosity: int | bool | None) -> LoggerWrapper:
     _set_formatter_once()
     assert _logger
+    result = LoggerWrapper(_logger)
     if verbosity is not None:
         if verbosity >= 2:
             level_number = logging.DEBUG
@@ -98,4 +119,15 @@ def setup_logging(verbosity: int | bool | None) -> logging.Logger:
         else:
             level_number = logging.WARNING
         _logger.setLevel(level_number)
-    return _logger
+    return result
+
+
+# TODO: expose this somehow
+def set_log_level(verbosity: int | bool):
+    if verbosity >= 2:
+        level_number = logging.DEBUG
+    elif verbosity == 1:  # True == 1
+        level_number = logging.INFO
+    else:
+        level_number = logging.WARNING
+    _logger.setLevel(level_number)
